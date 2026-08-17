@@ -18,6 +18,7 @@
     --accent-dark:#2c3968;
     --ok:#2f7a4f;
     --warn:#b4552f;
+    --dup:#9a6b1c;
     --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   }
   *{box-sizing:border-box;}
@@ -108,6 +109,7 @@
   .stat b{font-size:18px;display:block;font-weight:700;}
   .stat.ok b{color:var(--ok);}
   .stat.warn b{color:var(--warn);}
+  .stat.dup b{color:var(--dup);}
 
   table{width:100%;border-collapse:collapse;font-size:12.8px;}
   thead th{
@@ -120,6 +122,7 @@
   .fname-cell{font-family:var(--mono);color:var(--accent-dark);}
   .status-ok{color:var(--ok);font-weight:600;font-size:12px;}
   .status-warn{color:var(--warn);font-weight:600;font-size:12px;}
+  .status-dup{color:var(--dup);font-weight:600;font-size:12px;}
   .table-scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;}
   .table-scroll table{margin:0;}
   .table-scroll thead th{position:sticky;top:0;background:#fff;}
@@ -200,6 +203,7 @@
     <div class="summary-bar">
       <div class="stat ok"><b id="stat-matched">0</b>matched</div>
       <div class="stat warn"><b id="stat-unmatched">0</b>unmatched</div>
+      <div class="stat dup"><b id="stat-duplicate">0</b>duplicates</div>
       <div class="stat"><b id="stat-total">0</b>total groups</div>
       <div class="stat"><b id="stat-pages">0</b>PDF pages</div>
     </div>
@@ -222,7 +226,7 @@
       <button class="primary" id="btn-download-zip">Download all as ZIP</button>
       <button class="ghost" id="btn-download-log">Download mapping log (CSV)</button>
     </div>
-    <div class="note">Every matched page is split and saved at the root of the ZIP — even if the same roll number appears on more than one page, each still becomes its own file (auto-numbered if needed, e.g. "Sagar Patra (2).pdf"). Only pages where no matching row was found go into an <b>unmatched/</b> folder.</div>
+    <div class="note">Every physical page is always split into its own file — pages are never merged together. Matched, unique pages sit at the root of the ZIP. Pages where no matching row was found go into <b>unmatched/</b>. Pages whose identifier appears on more than one page (e.g. same roll number twice) go into <b>duplicates/</b> for a manual look.</div>
   </div>
 </div>
 
@@ -339,25 +343,15 @@ $('btn-process').addEventListener('click', () => {
     if(key !== '') lookup.set(key, row);
   });
 
-  // Group PDF pages: a new group starts whenever the regex finds a NEW key;
-  // pages with no match are appended to the current open group (continuation pages).
+  // Every physical page becomes its own group. Pages are NEVER merged with
+  // a neighbor just because one page's text extraction happened to miss
+  // the identifier — that caused unrelated pages (different roll numbers)
+  // to get bundled into a single output file.
   groups = [];
-  let current = null;
-
   pdfPageTexts.forEach((text, idx) => {
     const m = text.match(regex);
     const foundKey = m ? normalizeValue(m[1]) : null;
-
-    if(foundKey){
-      current = {pages:[idx], key: foundKey};
-      groups.push(current);
-    } else if(current){
-      current.pages.push(idx);
-    } else {
-      // no key found yet and no open group — stash as its own unmatched group
-      current = {pages:[idx], key: null};
-      groups.push(current);
-    }
+    groups.push({pages:[idx], key: foundKey});
   });
 
   // Resolve matches
@@ -365,15 +359,21 @@ $('btn-process').addEventListener('click', () => {
     g.matchedRow = g.key !== null ? (lookup.get(g.key) || null) : null;
   });
 
-  // Assign base filename + status.
-  // Note: if the same roll number appears on more than one page (e.g. a
-  // student has two separate letters), each page still gets matched and
-  // split normally — they just get auto-numbered so neither overwrites
-  // the other. Nothing gets diverted to a separate folder for this.
+  // How many separate pages share the same extracted key? (e.g. same roll
+  // number appears on two different pages — flagged as a duplicate so it
+  // gets a human look, rather than being silently treated as normal.)
+  const keyCounts = new Map();
+  groups.forEach(g => {
+    if(g.key !== null) keyCounts.set(g.key, (keyCounts.get(g.key) || 0) + 1);
+  });
+
   groups.forEach(g => {
     if(!g.matchedRow){
       g.status = 'unmatched';
       g.base = sanitizeFilename(g.key || ('page' + (g.pages[0]+1)));
+    } else if(g.key !== null && keyCounts.get(g.key) > 1){
+      g.status = 'duplicate';
+      g.base = sanitizeFilename(String(normalizeValue(g.matchedRow[renameCol]) || g.key));
     } else {
       g.status = 'ok';
       g.base = sanitizeFilename(String(normalizeValue(g.matchedRow[renameCol]) || 'unnamed'));
@@ -381,9 +381,8 @@ $('btn-process').addEventListener('click', () => {
   });
 
   // Assign final filenames, auto-numbering any collisions within each folder
-  // (same base name landing twice — from a repeated roll number, two
-  // students sharing a rename value, etc.)
-  const usedNames = { ok: new Map(), unmatched: new Map() };
+  // as a safety net (e.g. two students happening to share a rename value).
+  const usedNames = { ok: new Map(), unmatched: new Map(), duplicate: new Map() };
   groups.forEach(g => {
     const namePrefix = g.status === 'unmatched' ? 'UNMATCHED_' : '';
     let filename = `${prefix}${namePrefix}${g.base}${suffix}.pdf`;
@@ -405,21 +404,24 @@ $('btn-process').addEventListener('click', () => {
 
 const STATUS_LABEL = {
   ok: '<span class="status-ok">Matched</span>',
-  unmatched: '<span class="status-warn">Unmatched</span>'
+  unmatched: '<span class="status-warn">Unmatched</span>',
+  duplicate: '<span class="status-dup">Duplicate</span>'
 };
 const STATUS_FOLDER = {
   ok: '',
-  unmatched: 'unmatched/'
+  unmatched: 'unmatched/',
+  duplicate: 'duplicates/'
 };
 
 function renderPreview(){
   const tbody = $('preview-body');
   tbody.innerHTML = '';
-  let okCount = 0, warnCount = 0;
+  let okCount = 0, warnCount = 0, dupCount = 0;
 
   groups.forEach((g, i) => {
     if(g.status === 'ok') okCount++;
-    else warnCount++;
+    else if(g.status === 'unmatched') warnCount++;
+    else dupCount++;
 
     const pagesLabel = g.pages.length === 1
       ? String(g.pages[0]+1)
@@ -437,6 +439,7 @@ function renderPreview(){
 
   $('stat-matched').textContent = okCount;
   $('stat-unmatched').textContent = warnCount;
+  $('stat-duplicate').textContent = dupCount;
   $('stat-total').textContent = groups.length;
   $('stat-pages').textContent = pdfPageTexts.length;
 }
