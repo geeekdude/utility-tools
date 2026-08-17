@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Splitter &amp; Renamer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2430;
+    --paper:#f7f6f3;
+    --card:#ffffff;
+    --line:#e2e0da;
+    --accent:#3d4f8f;
+    --accent-dark:#2c3968;
+    --ok:#2f7a4f;
+    --warn:#b4552f;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height:1.5;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:36px 20px 80px;}
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--accent);font-weight:700;margin-bottom:6px;
+  }
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:-.01em;}
+  .sub{color:#5b6472;font-size:14.5px;max-width:640px;}
+
+  .step{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:22px 24px;
+    margin-bottom:18px;
+  }
+  .step.disabled{opacity:.45;pointer-events:none;}
+  .step-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .step-num{
+    width:24px;height:24px;border-radius:50%;
+    background:var(--accent);color:#fff;
+    font-size:12.5px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .step-title{font-size:15.5px;font-weight:650;}
+  .step-desc{font-size:13px;color:#6b7280;margin:2px 0 14px 34px;}
+
+  .dropzone{
+    border:1.5px dashed #c7c3ba;
+    border-radius:8px;
+    padding:22px;
+    text-align:center;
+    font-size:13.5px;
+    color:#7a7f88;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .dropzone:hover{border-color:var(--accent);background:#fafaf8;}
+  .dropzone.filled{border-style:solid;border-color:var(--ok);background:#f2f8f4;color:var(--ink);}
+  .dropzone input{display:none;}
+  .filename-badge{font-family:var(--mono);font-size:12.5px;color:var(--accent-dark);}
+
+  label.field-label{
+    display:block;font-size:12.5px;font-weight:650;color:#4a5160;
+    margin-bottom:5px;margin-top:14px;
+  }
+  select, input[type=text]{
+    width:100%;padding:9px 10px;border-radius:6px;
+    border:1px solid #d4d1c9;background:#fff;font-size:13.5px;color:var(--ink);
+    font-family: inherit;
+  }
+  input[type=text].mono{font-family:var(--mono);font-size:12.5px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .hint{font-size:11.5px;color:#8b8f97;margin-top:4px;}
+
+  button.primary{
+    background:var(--accent);color:#fff;border:none;
+    padding:11px 20px;border-radius:7px;font-size:14px;font-weight:600;
+    cursor:pointer;margin-top:18px;transition:background .15s;
+  }
+  button.primary:hover{background:var(--accent-dark);}
+  button.primary:disabled{background:#c9cbd3;cursor:not-allowed;}
+  button.ghost{
+    background:transparent;border:1px solid var(--line);color:var(--ink);
+    padding:9px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  button.ghost:hover{border-color:var(--accent);color:var(--accent-dark);}
+
+  .progress-wrap{margin-top:14px;display:none;}
+  .progress-bar{height:6px;background:#e9e7e1;border-radius:4px;overflow:hidden;}
+  .progress-fill{height:100%;width:0%;background:var(--accent);transition:width .1s;}
+  .progress-label{font-size:12px;color:#7a7f88;margin-top:6px;}
+
+  .summary-bar{
+    display:flex;gap:22px;flex-wrap:wrap;margin-bottom:16px;
+  }
+  .stat{font-size:13px;}
+  .stat b{font-size:18px;display:block;font-weight:700;}
+  .stat.ok b{color:var(--ok);}
+  .stat.warn b{color:var(--warn);}
+
+  table{width:100%;border-collapse:collapse;font-size:12.8px;}
+  thead th{
+    text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+    color:#8b8f97;padding:6px 8px;border-bottom:1px solid var(--line);font-weight:650;
+  }
+  tbody td{padding:7px 8px;border-bottom:1px solid #f0efeb;vertical-align:top;}
+  tbody tr:hover{background:#faf9f6;}
+  .pages-cell{font-family:var(--mono);color:#6b7280;}
+  .fname-cell{font-family:var(--mono);color:var(--accent-dark);}
+  .status-ok{color:var(--ok);font-weight:600;font-size:12px;}
+  .status-warn{color:var(--warn);font-weight:600;font-size:12px;}
+  .table-scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;}
+  .table-scroll table{margin:0;}
+  .table-scroll thead th{position:sticky;top:0;background:#fff;}
+
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+  .note{
+    font-size:12px;color:#8b8f97;margin-top:10px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Bulk document utility</div>
+    <h1>PDF Splitter &amp; Renamer</h1>
+    <div class="sub">Upload a compiled PDF and its matching Excel sheet. The tool finds an identifier on every page (e.g. Roll Number), matches it to the sheet row, and splits the PDF into one file per student — named from whichever column you choose. Everything runs locally in your browser; no files leave your machine.</div>
+  </header>
+
+  <!-- STEP 1 -->
+  <div class="step" id="step1">
+    <div class="step-head"><div class="step-num">1</div><div class="step-title">Upload the Excel sheet</div></div>
+    <div class="step-desc">.xlsx or .csv, with one row per student.</div>
+    <div class="dropzone" id="dz-excel">
+      <div id="dz-excel-text">Click to choose file, or drag it here</div>
+      <input type="file" id="file-excel" accept=".xlsx,.xls,.csv">
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step" id="step2">
+    <div class="step-head"><div class="step-num">2</div><div class="step-title">Upload the compiled PDF</div></div>
+    <div class="step-desc">One record per page (or per consecutive page group).</div>
+    <div class="dropzone" id="dz-pdf">
+      <div id="dz-pdf-text">Click to choose file, or drag it here</div>
+      <input type="file" id="file-pdf" accept="application/pdf">
+    </div>
+    <div class="progress-wrap" id="pdf-progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="pdf-progress-fill"></div></div>
+      <div class="progress-label" id="pdf-progress-label"></div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step disabled" id="step3">
+    <div class="step-head"><div class="step-num">3</div><div class="step-title">Set matching &amp; naming rules</div></div>
+    <div class="step-desc">Choose how each PDF page is identified, and what the output files should be called.</div>
+
+    <div class="row2">
+      <div>
+        <label class="field-label">Excel column to match against PDF text</label>
+        <select id="sel-match-col"></select>
+        <div class="hint">The tool searches each page for this pattern and reads the value that follows.</div>
+      </div>
+      <div>
+        <label class="field-label">Excel column to rename files by</label>
+        <select id="sel-rename-col"></select>
+        <div class="hint">e.g. Roll Number → 2524093.pdf</div>
+      </div>
+    </div>
+
+    <label class="field-label">Text pattern used to find the identifier on each page</label>
+    <input type="text" class="mono" id="regex-input" value="Roll Number\s*[:\-]?\s*(\d+)">
+    <div class="hint">Regex with one capture group — the captured text is what gets matched to the Excel column above. Default matches "Roll Number 2524093".</div>
+
+    <label class="field-label">Filename prefix / suffix (optional)</label>
+    <div class="row2">
+      <input type="text" id="fname-prefix" placeholder="Prefix, e.g. Letter_">
+      <input type="text" id="fname-suffix" placeholder="Suffix, e.g. _Aug2026">
+    </div>
+
+    <button class="primary" id="btn-process">Match &amp; preview</button>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step disabled" id="step4">
+    <div class="step-head"><div class="step-num">4</div><div class="step-title">Review and download</div></div>
+
+    <div class="summary-bar">
+      <div class="stat ok"><b id="stat-matched">0</b>matched</div>
+      <div class="stat warn"><b id="stat-unmatched">0</b>unmatched</div>
+      <div class="stat"><b id="stat-total">0</b>total groups</div>
+      <div class="stat"><b id="stat-pages">0</b>PDF pages</div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Pages</th><th>Extracted key</th><th>Output filename</th><th>Status</th>
+        </tr></thead>
+        <tbody id="preview-body"></tbody>
+      </table>
+    </div>
+
+    <div class="progress-wrap" id="zip-progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="zip-progress-fill"></div></div>
+      <div class="progress-label" id="zip-progress-label"></div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="btn-download-zip">Download all as ZIP</button>
+      <button class="ghost" id="btn-download-log">Download mapping log (CSV)</button>
+    </div>
+    <div class="note">Every matched page is split and saved at the root of the ZIP — even if the same roll number appears on more than one page, each still becomes its own file (auto-numbered if needed, e.g. "Sagar Patra (2).pdf"). Only pages where no matching row was found go into an <b>unmatched/</b> folder.</div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+let excelRows = [];      // array of objects, keyed by header
+let excelHeaders = [];
+let pdfArrayBuffer = null;
+let pdfPageTexts = [];   // text per page
+let groups = [];         // {pages:[idx...], key:string|null, matchedRow:obj|null, filename:string, status:'ok'|'warn'}
+
+const $ = (id) => document.getElementById(id);
+
+function setStepEnabled(stepId, enabled){
+  $(stepId).classList.toggle('disabled', !enabled);
+}
+
+/* ---------- Step 1: Excel ---------- */
+$('dz-excel').addEventListener('click', () => $('file-excel').click());
+$('file-excel').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const sheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+  excelRows = rows;
+  excelHeaders = rows.length ? Object.keys(rows[0]) : [];
+
+  $('dz-excel').classList.add('filled');
+  $('dz-excel-text').innerHTML = `<span class="filename-badge">${escapeHtml(file.name)}</span> — ${rows.length} rows, ${excelHeaders.length} columns`;
+
+  populateColumnSelects();
+  maybeEnableStep3();
+});
+
+/* ---------- Step 2: PDF ---------- */
+$('dz-pdf').addEventListener('click', () => $('file-pdf').click());
+$('file-pdf').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  pdfArrayBuffer = await file.arrayBuffer();
+
+  $('dz-pdf').classList.add('filled');
+  $('dz-pdf-text').innerHTML = `<span class="filename-badge">${escapeHtml(file.name)}</span> — extracting text…`;
+
+  $('pdf-progress-wrap').style.display = 'block';
+  const loadingTask = pdfjsLib.getDocument({data: pdfArrayBuffer.slice(0)});
+  const pdfDoc = await loadingTask.promise;
+  const numPages = pdfDoc.numPages;
+  pdfPageTexts = [];
+
+  for(let i = 1; i <= numPages; i++){
+    const page = await pdfDoc.getPage(i);
+    const content = await page.getTextContent();
+    const text = content.items.map(it => it.str).join(' ');
+    pdfPageTexts.push(text);
+
+    const pct = Math.round((i/numPages)*100);
+    $('pdf-progress-fill').style.width = pct + '%';
+    $('pdf-progress-label').textContent = `Reading page ${i} of ${numPages}`;
+    if(i % 15 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+
+  $('dz-pdf-text').innerHTML = `<span class="filename-badge">${escapeHtml(file.name)}</span> — ${numPages} pages read`;
+  $('pdf-progress-label').textContent = `Done — ${numPages} pages`;
+  maybeEnableStep3();
+});
+
+function maybeEnableStep3(){
+  if(excelRows.length && pdfPageTexts.length){
+    setStepEnabled('step3', true);
+  }
+}
+
+function populateColumnSelects(){
+  const matchSel = $('sel-match-col');
+  const renameSel = $('sel-rename-col');
+  matchSel.innerHTML = '';
+  renameSel.innerHTML = '';
+  excelHeaders.forEach(h => {
+    const o1 = document.createElement('option'); o1.value = h; o1.textContent = h;
+    const o2 = document.createElement('option'); o2.value = h; o2.textContent = h;
+    matchSel.appendChild(o1);
+    renameSel.appendChild(o2);
+  });
+  // best-effort default: pick a header containing "roll" for match column
+  const rollGuess = excelHeaders.find(h => /roll/i.test(h));
+  if(rollGuess) matchSel.value = rollGuess;
+  const nameGuess = excelHeaders.find(h => /roll/i.test(h)) || excelHeaders[0];
+  if(nameGuess) renameSel.value = rollGuess || excelHeaders[0];
+}
+
+/* ---------- Step 3: Process ---------- */
+$('btn-process').addEventListener('click', () => {
+  const matchCol = $('sel-match-col').value;
+  const renameCol = $('sel-rename-col').value;
+  const prefix = $('fname-prefix').value || '';
+  const suffix = $('fname-suffix').value || '';
+  let regex;
+  try{
+    regex = new RegExp($('regex-input').value);
+  }catch(err){
+    alert('That pattern is not a valid regular expression:\n' + err.message);
+    return;
+  }
+
+  // Build lookup from excel: normalized match-value -> row
+  const lookup = new Map();
+  excelRows.forEach(row => {
+    const key = normalizeValue(row[matchCol]);
+    if(key !== '') lookup.set(key, row);
+  });
+
+  // Group PDF pages: a new group starts whenever the regex finds a NEW key;
+  // pages with no match are appended to the current open group (continuation pages).
+  groups = [];
+  let current = null;
+
+  pdfPageTexts.forEach((text, idx) => {
+    const m = text.match(regex);
+    const foundKey = m ? normalizeValue(m[1]) : null;
+
+    if(foundKey){
+      current = {pages:[idx], key: foundKey};
+      groups.push(current);
+    } else if(current){
+      current.pages.push(idx);
+    } else {
+      // no key found yet and no open group — stash as its own unmatched group
+      current = {pages:[idx], key: null};
+      groups.push(current);
+    }
+  });
+
+  // Resolve matches
+  groups.forEach(g => {
+    g.matchedRow = g.key !== null ? (lookup.get(g.key) || null) : null;
+  });
+
+  // Assign base filename + status.
+  // Note: if the same roll number appears on more than one page (e.g. a
+  // student has two separate letters), each page still gets matched and
+  // split normally — they just get auto-numbered so neither overwrites
+  // the other. Nothing gets diverted to a separate folder for this.
+  groups.forEach(g => {
+    if(!g.matchedRow){
+      g.status = 'unmatched';
+      g.base = sanitizeFilename(g.key || ('page' + (g.pages[0]+1)));
+    } else {
+      g.status = 'ok';
+      g.base = sanitizeFilename(String(normalizeValue(g.matchedRow[renameCol]) || 'unnamed'));
+    }
+  });
+
+  // Assign final filenames, auto-numbering any collisions within each folder
+  // (same base name landing twice — from a repeated roll number, two
+  // students sharing a rename value, etc.)
+  const usedNames = { ok: new Map(), unmatched: new Map() };
+  groups.forEach(g => {
+    const namePrefix = g.status === 'unmatched' ? 'UNMATCHED_' : '';
+    let filename = `${prefix}${namePrefix}${g.base}${suffix}.pdf`;
+    const used = usedNames[g.status];
+    if(used.has(filename)){
+      const n = used.get(filename) + 1;
+      used.set(filename, n);
+      filename = `${prefix}${namePrefix}${g.base}${suffix} (${n}).pdf`;
+    } else {
+      used.set(filename, 1);
+    }
+    g.filename = filename;
+  });
+
+  renderPreview();
+  setStepEnabled('step4', true);
+  document.getElementById('step4').scrollIntoView({behavior:'smooth', block:'start'});
+});
+
+const STATUS_LABEL = {
+  ok: '<span class="status-ok">Matched</span>',
+  unmatched: '<span class="status-warn">Unmatched</span>'
+};
+const STATUS_FOLDER = {
+  ok: '',
+  unmatched: 'unmatched/'
+};
+
+function renderPreview(){
+  const tbody = $('preview-body');
+  tbody.innerHTML = '';
+  let okCount = 0, warnCount = 0;
+
+  groups.forEach((g, i) => {
+    if(g.status === 'ok') okCount++;
+    else warnCount++;
+
+    const pagesLabel = g.pages.length === 1
+      ? String(g.pages[0]+1)
+      : `${g.pages[0]+1}–${g.pages[g.pages.length-1]+1}`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td class="pages-cell">${pagesLabel}</td>
+      <td>${escapeHtml(g.key ?? '—')}</td>
+      <td class="fname-cell">${escapeHtml(STATUS_FOLDER[g.status])}${escapeHtml(g.filename)}</td>
+      <td>${STATUS_LABEL[g.status]}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  $('stat-matched').textContent = okCount;
+  $('stat-unmatched').textContent = warnCount;
+  $('stat-total').textContent = groups.length;
+  $('stat-pages').textContent = pdfPageTexts.length;
+}
+
+/* ---------- Step 4: Download ---------- */
+$('btn-download-zip').addEventListener('click', async () => {
+  $('zip-progress-wrap').style.display = 'block';
+  $('zip-progress-label').textContent = 'Loading source PDF…';
+
+  const srcDoc = await PDFLib.PDFDocument.load(pdfArrayBuffer);
+  const zip = new JSZip();
+
+  for(let i = 0; i < groups.length; i++){
+    const g = groups[i];
+    const outDoc = await PDFLib.PDFDocument.create();
+    const copiedPages = await outDoc.copyPages(srcDoc, g.pages);
+    copiedPages.forEach(p => outDoc.addPage(p));
+    const bytes = await outDoc.save();
+    zip.file(STATUS_FOLDER[g.status] + g.filename, bytes);
+
+    const pct = Math.round(((i+1)/groups.length)*100);
+    $('zip-progress-fill').style.width = pct + '%';
+    $('zip-progress-label').textContent = `Building file ${i+1} of ${groups.length}`;
+    if(i % 10 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+
+  $('zip-progress-label').textContent = 'Zipping…';
+  const blob = await zip.generateAsync({type:'blob'}, (meta) => {
+    $('zip-progress-fill').style.width = Math.round(meta.percent) + '%';
+  });
+  $('zip-progress-label').textContent = 'Done';
+  downloadBlob(blob, 'split_pdfs.zip');
+});
+
+$('btn-download-log').addEventListener('click', () => {
+  const rows = [['#','Pages','Extracted Key','Status','Output Path']];
+  groups.forEach((g,i) => {
+    const pagesLabel = g.pages.length === 1 ? String(g.pages[0]+1) : `${g.pages[0]+1}-${g.pages[g.pages.length-1]+1}`;
+    rows.push([i+1, pagesLabel, g.key ?? '', g.status, STATUS_FOLDER[g.status] + g.filename]);
+  });
+  const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  downloadBlob(blob, 'mapping_log.csv');
+});
+
+/* ---------- Helpers ---------- */
+function normalizeValue(v){
+  if(v === null || v === undefined) return '';
+  if(typeof v === 'number') return String(Math.trunc(v) === v ? Math.trunc(v) : v);
+  return String(v).trim();
+}
+function sanitizeFilename(s){
+  return s.replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() || 'unnamed';
+}
+function csvEscape(v){
+  const s = String(v ?? '');
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/* drag & drop support */
+['dz-excel','dz-pdf'].forEach(id => {
+  const el = $(id);
+  el.addEventListener('dragover', e => { e.preventDefault(); el.style.borderColor = 'var(--accent)'; });
+  el.addEventListener('dragleave', () => { el.style.borderColor = ''; });
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    el.style.borderColor = '';
+    const inputId = id === 'dz-excel' ? 'file-excel' : 'file-pdf';
+    const input = $(inputId);
+    input.files = e.dataTransfer.files;
+    input.dispatchEvent(new Event('change'));
+  });
+});
+</script>
+</body>
+</html>
