@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GEHU UFM Committee Mailer</title>
+<title>GEHU Bulk Mailer</title>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.18.0/lib/msal-browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -17,117 +17,58 @@
     --text: #1c2530;
     --text-muted: #5b6673;
     --error: #b3261e;
-    --warn: #a9660a;
   }
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-  }
-  header {
-    background: linear-gradient(135deg, var(--gehu-blue), var(--gehu-blue-light));
-    color: white;
-    padding: 22px 28px;
-  }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
+  header { background: linear-gradient(135deg, var(--gehu-blue), var(--gehu-blue-light)); color: white; padding: 22px 28px; }
   header h1 { margin: 0; font-size: 1.35rem; font-weight: 600; }
   header p { margin: 4px 0 0; font-size: 0.85rem; opacity: 0.85; }
-
-  main {
-    max-width: 920px;
-    margin: 24px auto 60px;
-    padding: 0 16px;
-  }
-
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px 22px;
-    margin-bottom: 18px;
-  }
-  .card h2 {
-    font-size: 0.95rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-muted);
-    margin: 0 0 14px;
-    font-weight: 700;
-  }
-
+  main { max-width: 920px; margin: 24px auto 60px; padding: 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px 22px; margin-bottom: 18px; }
+  .card h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0 0 14px; font-weight: 700; }
   label { display: block; font-size: 0.85rem; font-weight: 600; margin: 10px 0 4px; }
-  label.inline { display: inline; font-weight: 500; }
+  label.checkbox-label { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+  label.checkbox-label input { width: auto; }
   input[type=text], input[type=file], select, textarea {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-family: inherit;
-    background: #fff;
-    color: var(--text);
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 0.9rem; font-family: inherit; background: #fff; color: var(--text);
   }
-  textarea { resize: vertical; }
+  textarea { resize: vertical; font-family: "SFMono-Regular", Consolas, monospace; }
   .row { display: flex; gap: 16px; flex-wrap: wrap; }
   .row > div { flex: 1; min-width: 220px; }
-
   button {
-    font-family: inherit;
-    font-size: 0.88rem;
-    font-weight: 600;
-    padding: 9px 16px;
-    border-radius: 6px;
-    border: 1px solid var(--gehu-blue);
-    background: var(--gehu-blue);
-    color: white;
-    cursor: pointer;
+    font-family: inherit; font-size: 0.88rem; font-weight: 600; padding: 9px 16px; border-radius: 6px;
+    border: 1px solid var(--gehu-blue); background: var(--gehu-blue); color: white; cursor: pointer;
   }
   button.secondary { background: white; color: var(--gehu-blue); }
-  button.danger { background: #fff; color: var(--error); border-color: var(--error); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   button + button { margin-left: 8px; }
-
-  .status-pill {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 100px;
-    font-size: 0.78rem;
-    font-weight: 600;
-  }
+  .status-pill { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 0.78rem; font-weight: 600; }
   .status-signedout { background: #fdecea; color: var(--error); }
   .status-signedin { background: #e6f4ec; color: var(--accent); }
-
   #log {
-    background: #0e1621;
-    color: #d7e2ea;
-    font-family: "SFMono-Regular", Consolas, monospace;
-    font-size: 0.78rem;
-    padding: 12px 14px;
-    border-radius: 8px;
-    height: 260px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    line-height: 1.5;
+    background: #0e1621; color: #d7e2ea; font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.78rem;
+    padding: 12px 14px; border-radius: 8px; height: 260px; overflow-y: auto; white-space: pre-wrap; line-height: 1.5;
   }
-  .log-ok { color: #7fd99a; }
-  .log-err { color: #ff8a80; }
-  .log-warn { color: #ffcf7a; }
-
-  table.preview { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 10px; }
-  table.preview th, table.preview td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-  table.preview th { color: var(--text-muted); font-weight: 600; }
-
+  .log-ok { color: #7fd99a; } .log-err { color: #ff8a80; } .log-warn { color: #ffcf7a; }
   .hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
   .actions { margin-top: 16px; }
   progress { width: 100%; height: 8px; margin-top: 10px; }
+  .chip-box { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+  .chip {
+    display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 0.78rem; font-family: "SFMono-Regular", Consolas, monospace;
+    background: #eef2f7; border: 1px solid var(--border); color: var(--gehu-blue); cursor: pointer;
+  }
+  .chip:hover { background: #dbe6f2; }
+  .pdf-section { transition: opacity 0.15s; }
+  .pdf-section.disabled { opacity: 0.45; pointer-events: none; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>GEHU UFM Committee Mailer</h1>
-  <p>Send personalized UFM Committee Decision emails with attached PDFs, straight from your browser.</p>
+  <h1>GEHU Bulk Mailer</h1>
+  <p>Send personalized emails - with any Excel column as a placeholder, attachment optional - straight from your browser.</p>
 </header>
 
 <main>
@@ -153,51 +94,48 @@
   </div>
 
   <div class="card">
-    <h2>2. Student data</h2>
+    <h2>2. Recipient data</h2>
     <label>Excel file (.xlsx)</label>
     <input type="file" id="excelFile" accept=".xlsx,.xls">
     <div class="row">
       <div>
-        <label>Student Name column</label>
-        <select id="nameCol"><option value="">Load Excel first</option></select>
-      </div>
-      <div>
         <label>Email column</label>
         <select id="emailCol"><option value="">Load Excel first</option></select>
-      </div>
-      <div>
-        <label>PDF-matching column (e.g. Roll No)</label>
-        <select id="keyCol"><option value="">Load Excel first</option></select>
       </div>
     </div>
     <p class="hint" id="excelSummary"></p>
   </div>
 
   <div class="card">
-    <h2>3. PDF letters</h2>
-    <label>Select all student PDF files (filenames must match the key column values, e.g. 2524093.pdf)</label>
-    <input type="file" id="pdfFiles" accept="application/pdf" multiple>
-    <p class="hint" id="pdfSummary"></p>
+    <h2>3. Attachment (optional)</h2>
+    <label class="checkbox-label">
+      <input type="checkbox" id="attachToggle" checked>
+      Attach a file to each email
+    </label>
+    <div id="pdfSection" class="pdf-section">
+      <label>Matching column (the file name must match this column's value, e.g. Roll No -> 2524093.pdf)</label>
+      <select id="keyCol"><option value="">Load Excel first</option></select>
+      <label>Select all attachment files (PDF)</label>
+      <input type="file" id="pdfFiles" accept="application/pdf" multiple>
+      <p class="hint" id="pdfSummary"></p>
+    </div>
   </div>
 
   <div class="card">
     <h2>4. Email content</h2>
+    <p class="hint">Click a placeholder below to insert it into Subject or Body at your cursor. Every Excel column becomes one automatically once loaded.</p>
+    <div class="chip-box" id="placeholderChips"><span class="hint">Load your Excel file to see available placeholders.</span></div>
+
     <label>CC list (one email address per line, same for every mail this run)</label>
     <textarea id="ccList" rows="3" placeholder="registrar@gehu.ac.in&#10;deanacademics@gehu.ac.in"></textarea>
 
-    <label>Subject (use {name} to insert the student's name)</label>
-    <input type="text" id="subject" value="UFM Committee Decision - {name}">
+    <label>Subject</label>
+    <input type="text" id="subject" value="">
 
-    <label>Body (use {name} to insert the student's name)</label>
-    <textarea id="body" rows="9">Dear {name},
+    <label>Body</label>
+    <textarea id="body" rows="9">Dear {Student Name},
 
-Please find attached the UFM Committee Decision.
-
-Evaluation Cell
-Graphic Era Hill University
-Society Area, Clement Town,
-Dehradun-248002.
-http://www.gehu.ac.in/</textarea>
+</textarea>
   </div>
 
   <div class="card">
@@ -208,7 +146,7 @@ http://www.gehu.ac.in/</textarea>
       <button id="downloadLogBtn" class="secondary" style="display:none;">Download log CSV</button>
     </div>
     <progress id="progressBar" value="0" max="1" style="display:none;"></progress>
-    <div id="log" style="margin-top:14px;">Ready. Sign in, load your Excel file and PDFs, then click Preview.</div>
+    <div id="log" style="margin-top:14px;">Ready. Sign in, load your Excel file, then click Preview.</div>
   </div>
 
 </main>
@@ -219,8 +157,10 @@ const $ = (id) => document.getElementById(id);
 let msalInstance = null;
 let account = null;
 let workbookRows = [];
-let pdfFileMap = new Map(); // normalized filename (no ext) -> File
+let columns = [];
+let pdfFileMap = new Map();
 let lastResults = [];
+let lastFocusedField = null;
 
 const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -236,24 +176,28 @@ function logLine(msg, cls) {
   el.appendChild(span);
   el.scrollTop = el.scrollHeight;
 }
+function clearLog() { $("log").innerHTML = ""; }
 
-function clearLog() {
-  $("log").innerHTML = "";
+function renderTemplate(tpl, row) {
+  let result = tpl;
+  for (const col of columns) {
+    result = result.split(`{${col}}`).join(String(row[col] ?? ""));
+  }
+  return result;
 }
+
+// ---------------- Attachment toggle ----------------
+$("attachToggle").addEventListener("change", () => {
+  $("pdfSection").classList.toggle("disabled", !$("attachToggle").checked);
+});
 
 // ---------------- MSAL sign-in ----------------
 function buildMsalConfig() {
   const clientId = $("clientId").value.trim();
   const tenantId = $("tenantId").value.trim();
-  if (!clientId || !tenantId) {
-    throw new Error("Please enter both Client ID and Tenant ID first.");
-  }
+  if (!clientId || !tenantId) throw new Error("Please enter both Client ID and Tenant ID first.");
   return {
-    auth: {
-      clientId,
-      authority: `https://login.microsoftonline.com/${tenantId}`,
-      redirectUri: window.location.origin + window.location.pathname,
-    },
+    auth: { clientId, authority: `https://login.microsoftonline.com/${tenantId}`, redirectUri: window.location.origin + window.location.pathname },
     cache: { cacheLocation: "localStorage" },
   };
 }
@@ -263,9 +207,8 @@ $("signInBtn").addEventListener("click", async () => {
     const cfg = buildMsalConfig();
     msalInstance = new msal.PublicClientApplication(cfg);
     await msalInstance.initialize();
-    localStorage.setItem("ufm_client_id", cfg.auth.clientId);
-    localStorage.setItem("ufm_tenant_id", $("tenantId").value.trim());
-
+    localStorage.setItem("bulkmail_client_id", cfg.auth.clientId);
+    localStorage.setItem("bulkmail_tenant_id", $("tenantId").value.trim());
     const loginResp = await msalInstance.loginPopup({ scopes: ["Mail.Send"] });
     account = loginResp.account;
     msalInstance.setActiveAccount(account);
@@ -277,9 +220,7 @@ $("signInBtn").addEventListener("click", async () => {
 });
 
 $("signOutBtn").addEventListener("click", async () => {
-  if (msalInstance && account) {
-    await msalInstance.logoutPopup({ account });
-  }
+  if (msalInstance && account) await msalInstance.logoutPopup({ account });
   account = null;
   onSignedOut();
 });
@@ -292,7 +233,6 @@ function onSignedIn() {
   $("sendBtn").disabled = false;
   logLine("Signed in as " + account.username, "log-ok");
 }
-
 function onSignedOut() {
   $("signInStatus").textContent = "Not signed in";
   $("signInStatus").className = "status-pill status-signedout";
@@ -300,7 +240,6 @@ function onSignedOut() {
   $("signOutBtn").style.display = "none";
   $("sendBtn").disabled = true;
 }
-
 async function getAccessToken() {
   if (!msalInstance || !account) throw new Error("Not signed in.");
   try {
@@ -312,13 +251,37 @@ async function getAccessToken() {
   }
 }
 
-// Restore saved client/tenant IDs
 window.addEventListener("load", () => {
-  const savedClient = localStorage.getItem("ufm_client_id");
-  const savedTenant = localStorage.getItem("ufm_tenant_id");
+  const savedClient = localStorage.getItem("bulkmail_client_id");
+  const savedTenant = localStorage.getItem("bulkmail_tenant_id");
   if (savedClient) $("clientId").value = savedClient;
   if (savedTenant) $("tenantId").value = savedTenant;
 });
+
+// ---------------- Placeholder insertion ----------------
+$("subject").addEventListener("focus", () => lastFocusedField = $("subject"));
+$("body").addEventListener("focus", () => lastFocusedField = $("body"));
+
+function insertPlaceholder(token) {
+  const field = lastFocusedField || $("body");
+  const start = field.selectionStart ?? field.value.length;
+  const end = field.selectionEnd ?? field.value.length;
+  field.value = field.value.slice(0, start) + token + field.value.slice(end);
+  field.focus();
+  field.selectionStart = field.selectionEnd = start + token.length;
+}
+
+function renderPlaceholderChips() {
+  const box = $("placeholderChips");
+  box.innerHTML = "";
+  columns.forEach((col) => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = `{${col}}`;
+    chip.addEventListener("click", () => insertPlaceholder(`{${col}}`));
+    box.appendChild(chip);
+  });
+}
 
 // ---------------- Excel loading ----------------
 $("excelFile").addEventListener("change", async (ev) => {
@@ -334,17 +297,18 @@ $("excelFile").addEventListener("change", async (ev) => {
     return;
   }
 
-  const cols = Object.keys(workbookRows[0]);
-  for (const selectId of ["nameCol", "emailCol", "keyCol"]) {
+  columns = Object.keys(workbookRows[0]);
+  for (const selectId of ["emailCol", "keyCol"]) {
     const sel = $(selectId);
     sel.innerHTML = "";
-    cols.forEach((c) => {
+    columns.forEach((c) => {
       const opt = document.createElement("option");
       opt.value = c; opt.textContent = c;
       sel.appendChild(opt);
     });
   }
-  $("excelSummary").textContent = `Loaded ${workbookRows.length} rows, ${cols.length} columns: ${cols.join(", ")}`;
+  $("excelSummary").textContent = `Loaded ${workbookRows.length} rows, ${columns.length} columns: ${columns.join(", ")}`;
+  renderPlaceholderChips();
   logLine(`Loaded Excel: ${workbookRows.length} rows.`, "log-ok");
 });
 
@@ -364,7 +328,6 @@ $("pdfFiles").addEventListener("change", (ev) => {
 function getCcList() {
   return $("ccList").value.split("\n").map((s) => s.trim()).filter(Boolean);
 }
-
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -375,19 +338,24 @@ function fileToBase64(file) {
 }
 
 function buildRows() {
-  const nameCol = $("nameCol").value, emailCol = $("emailCol").value, keyCol = $("keyCol").value;
-  if (!nameCol || !emailCol || !keyCol) {
-    throw new Error("Please select the Name, Email, and PDF-matching columns.");
-  }
+  const emailCol = $("emailCol").value;
+  const attachOn = $("attachToggle").checked;
+  const keyCol = $("keyCol").value;
+  if (!emailCol) throw new Error("Please select the Email column.");
+  if (attachOn && !keyCol) throw new Error("Please select the attachment-matching column, or turn off the attachment toggle.");
+
   return workbookRows.map((row, idx) => {
-    const name = String(row[nameCol] ?? "").trim();
     const email = String(row[emailCol] ?? "").trim();
-    const key = row[keyCol];
-    const pdfFile = pdfFileMap.get(normalizeKey(key)) || null;
-    let status = "OK", error = "";
-    if (!email || !emailRegex.test(email)) { status = "SKIPPED"; error = `Invalid/missing email: '${email}'`; }
-    else if (!pdfFile) { status = "SKIPPED"; error = `No PDF found matching '${key}'`; }
-    return { rowNum: idx + 2, name, email, key, pdfFile, status, error };
+    let status = "OK", error = "", pdfFile = null;
+
+    if (!email || !emailRegex.test(email)) {
+      status = "SKIPPED"; error = `Invalid/missing email: '${email}'`;
+    } else if (attachOn) {
+      const key = row[keyCol];
+      pdfFile = pdfFileMap.get(normalizeKey(key)) || null;
+      if (!pdfFile) { status = "SKIPPED"; error = `No attachment found matching '${key}'`; }
+    }
+    return { rowNum: idx + 2, row, email, pdfFile, status, error };
   });
 }
 
@@ -397,12 +365,13 @@ $("previewBtn").addEventListener("click", () => {
   try {
     if (workbookRows.length === 0) throw new Error("Load the Excel file first.");
     const rows = buildRows();
-    lastResults = rows.map(r => ({ ...r, finalStatus: r.status === "OK" ? "DRY_RUN" : r.status }));
+    const attachOn = $("attachToggle").checked;
     let ok = 0, skipped = 0;
     for (const r of rows) {
       if (r.status === "OK") {
         ok++;
-        logLine(`[Row ${r.rowNum}] DRY-RUN -> To: ${r.email} | CC: ${getCcList().join(", ")} | PDF: ${r.pdfFile.name}`, "log-ok");
+        const attachInfo = attachOn ? ` | Attachment: ${r.pdfFile.name}` : " | No attachment";
+        logLine(`[Row ${r.rowNum}] DRY-RUN -> To: ${r.email} | CC: ${getCcList().join(", ")}${attachInfo}`, "log-ok");
       } else {
         skipped++;
         logLine(`[Row ${r.rowNum}] SKIP - ${r.error}`, "log-warn");
@@ -423,6 +392,7 @@ $("sendBtn").addEventListener("click", async () => {
     if (workbookRows.length === 0) throw new Error("Load the Excel file first.");
     const rows = buildRows();
     const ccList = getCcList();
+    const attachOn = $("attachToggle").checked;
     const readyCount = rows.filter(r => r.status === "OK").length;
 
     const confirmed = confirm(
@@ -451,20 +421,21 @@ $("sendBtn").addEventListener("click", async () => {
         $("progressBar").value++;
         continue;
       }
-
       try {
-        const contentBytes = await fileToBase64(r.pdfFile);
         const message = {
-          subject: subjectTpl.replace(/{name}/g, r.name),
-          body: { contentType: "Text", content: bodyTpl.replace(/{name}/g, r.name) },
+          subject: renderTemplate(subjectTpl, r.row),
+          body: { contentType: "Text", content: renderTemplate(bodyTpl, r.row) },
           toRecipients: [{ emailAddress: { address: r.email } }],
           ccRecipients: ccList.map(e => ({ emailAddress: { address: e } })),
-          attachments: [{
+        };
+        if (attachOn && r.pdfFile) {
+          const contentBytes = await fileToBase64(r.pdfFile);
+          message.attachments = [{
             "@odata.type": "#microsoft.graph.fileAttachment",
             name: r.pdfFile.name,
             contentBytes,
-          }],
-        };
+          }];
+        }
 
         let resp = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
           method: "POST",
@@ -489,7 +460,7 @@ $("sendBtn").addEventListener("click", async () => {
         sent++;
         logLine(`[Row ${r.rowNum}] SENT -> ${r.email}`, "log-ok");
         lastResults.push({ ...r, finalStatus: "SENT" });
-        await new Promise(res => setTimeout(res, 3000)); // throttle to reduce spam-flagging
+        await new Promise(res => setTimeout(res, 3000));
       } catch (e) {
         errors++;
         logLine(`[Row ${r.rowNum}] ERROR - ${e.message}`, "log-err");
@@ -510,17 +481,17 @@ $("sendBtn").addEventListener("click", async () => {
 
 // ---------------- CSV log download ----------------
 $("downloadLogBtn").addEventListener("click", () => {
-  const header = ["Row", "Name", "Email", "Key", "PDF", "Status", "Error"];
+  const header = ["Row", "Email", "Attachment", "Status", "Error"];
   const lines = [header.join(",")];
   for (const r of lastResults) {
     const pdfName = r.pdfFile ? r.pdfFile.name : "";
-    const vals = [r.rowNum, r.name, r.email, r.key, pdfName, r.finalStatus, (r.error || "").replace(/,/g, ";")];
+    const vals = [r.rowNum, r.email, pdfName, r.finalStatus, (r.error || "").replace(/,/g, ";")];
     lines.push(vals.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
   }
   const blob = new Blob([lines.join("\n")], { type: "text/csv" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `ufm_mailer_log_${new Date().toISOString().slice(0,19).replace(/[:T]/g,"-")}.csv`;
+  a.download = `bulkmail_log_${new Date().toISOString().slice(0,19).replace(/[:T]/g,"-")}.csv`;
   a.click();
 });
 </script>
